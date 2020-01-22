@@ -3,22 +3,16 @@
 
 from __future__ import unicode_literals
 
-import os
+import functools
 import json
 import logging
-import warnings
+import queue
 import threading
-import functools
+import warnings
 
 import websocket
 
 from .exceptions import *
-
-try:
-    import Queue as queue
-except ImportError:
-    import queue
-
 
 __all__ = ["Tab"]
 
@@ -52,7 +46,6 @@ class Tab(object):
     def __init__(self, **kwargs):
         self.id = kwargs.get("id")
         self.type = kwargs.get("type")
-        self.debug = os.getenv("DEBUG", False)
 
         self._websocket_url = kwargs.get("webSocketDebuggerUrl")
         self._kwargs = kwargs
@@ -73,6 +66,7 @@ class Tab(object):
         self.event_handlers = {}
         self.method_results = {}
         self.event_queue = queue.Queue()
+        self.context_id = None
 
     def _send(self, message, timeout=None):
         if 'id' not in message:
@@ -81,8 +75,7 @@ class Tab(object):
 
         message_json = json.dumps(message)
 
-        if self.debug:  # pragma: no cover
-            print("SEND > %s" % message_json)
+        logging.debug("SEND > %s" % message_json)
 
         if not isinstance(timeout, (int, float)) or timeout > 1:
             q_timeout = 1
@@ -128,8 +121,7 @@ class Tab(object):
                     self._stopped.set()
                 return
 
-            if self.debug:  # pragma: no cover
-                print('< RECV %s' % message_json)
+            logging.debug('< RECV %s' % message_json)
 
             if "method" in message:
                 self.event_queue.put(message)
@@ -174,7 +166,9 @@ class Tab(object):
         result = self._send({"method": _method, "params": kwargs}, timeout=timeout)
         if 'result' not in result and 'error' in result:
             warnings.warn("%s error: %s" % (_method, result['error']['message']))
-            raise CallMethodException("calling method: %s error: %s" % (_method, result['error']['message']))
+            raise CallMethodException(
+                "calling method: %s error: %s" % (_method, result['error']['message'])
+            )
 
         return result['result']
 
