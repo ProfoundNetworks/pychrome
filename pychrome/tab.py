@@ -16,8 +16,8 @@ from .exceptions import *
 
 __all__ = ["Tab"]
 
-
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
+_LOGGER.addHandler(logging.NullHandler())
 
 
 class GenericAttr(object):
@@ -75,7 +75,7 @@ class Tab(object):
 
         message_json = json.dumps(message)
 
-        logging.debug("SEND > %s" % message_json)
+        _LOGGER.debug("SEND > %s" % message_json)
 
         if not isinstance(timeout, (int, float)) or timeout > 1:
             q_timeout = 1
@@ -117,11 +117,11 @@ class Tab(object):
                 continue
             except (websocket.WebSocketException, OSError):
                 if not self._stopped.is_set():
-                    logger.error("websocket exception", exc_info=True)
+                    _LOGGER.error("websocket exception", exc_info=True)
                     self._stopped.set()
                 return
 
-            logging.debug('< RECV %s' % message_json)
+            _LOGGER.debug('< RECV %s' % message_json)
 
             if "method" in message:
                 self.event_queue.put(message)
@@ -143,7 +143,7 @@ class Tab(object):
                 try:
                     self.event_handlers[event['method']](**event['params'])
                 except Exception as e:
-                    logger.error("callback %s exception" % event['method'], exc_info=True)
+                    _LOGGER.error("callback %s exception" % event['method'], exc_info=True)
 
             self.event_queue.task_done()
 
